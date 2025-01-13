@@ -41,6 +41,22 @@
             background-color: #4CAF50;
             color: white;
         }
+
+        form {
+            margin-top: 20px;
+        }
+
+        input {
+            padding: 8px;
+            margin-right: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -50,11 +66,20 @@
     <button onclick="goToProductById(1)">Go to "Product 1"</button>
     <button onclick="goToProductById(2)">Go to "Product 2"</button>
 
+    <!-- Форма для додавання нового продукту -->
+    <form id="addProductForm">
+        <input type="text" id="productName" placeholder="Product Name" required>
+        <input type="number" id="productPrice" placeholder="Product Price" step="0.01" required>
+        <button type="submit">Add Product</button>
+    </form>
+    <div id="errorMessage" class="error"></div>
+
     <table>
         <thead>
             <tr>
                 <th>ID</th>
                 <th>Name</th>
+                <th>Price</th>
             </tr>
         </thead>
         <tbody id="productsTable">
@@ -63,17 +88,25 @@
 
     <script>
         // Завантаження продуктів у таблицю
-        fetch('/api/products')
-            .then(response => response.json())
-            .then(data => {
-                const tableBody = document.getElementById('productsTable');
-                data.forEach((product, index) => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `<td>${index + 1}</td><td>${product}</td>`;
-                    tableBody.appendChild(row);
-                });
-            })
-            .catch(error => console.error('Error fetching products:', error));
+        function loadProducts() {
+            fetch('/api/products')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('productsTable');
+                    tableBody.innerHTML = ''; // Очистити таблицю перед оновленням
+                    let id = 1;
+                    data.forEach(product => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `<td>${id}</td><td>${product.name}</td><td>${product.price}</td>`;
+                        tableBody.appendChild(row);
+                        id++;
+                    });
+                })
+                .catch(error => console.error('Error fetching products:', error));
+        }
+
+        // Завантажити продукти при завантаженні сторінки
+        loadProducts();
 
         // Функція для переходу на сторінку API (всі продукти)
         function goToProducts() {
@@ -84,6 +117,36 @@
         function goToProductById(id) {
             window.location.href = `/api/products/${id}`;
         }
+
+        // Додавання нового продукту
+        document.getElementById('addProductForm').addEventListener('submit', function (event) {
+            event.preventDefault(); // Заборонити стандартну поведінку форми
+
+            const productName = document.getElementById('productName').value;
+            const productPrice = parseFloat(document.getElementById('productPrice').value);
+
+            fetch('/api/products', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: productName, price: productPrice }),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw err; });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('errorMessage').textContent = ''; // Очистити повідомлення про помилку
+                    alert('Product added successfully!');
+                    loadProducts(); // Оновити список продуктів
+                })
+                .catch(error => {
+                    document.getElementById('errorMessage').textContent = error.errors ? Object.values(error.errors).join(', ') : 'Failed to add product.';
+                });
+        });
     </script>
 </body>
 </html>
