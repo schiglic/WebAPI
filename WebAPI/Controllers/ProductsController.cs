@@ -1,7 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
+using System.Linq;
 using FluentValidation;
 using FluentValidation.Results;
+using WebAPI; 
 
 namespace WebAPI.Controllers
 {
@@ -9,74 +12,75 @@ namespace WebAPI.Controllers
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
-        // Список продуктів з ID, назвами та цінами
-        private static Dictionary<int, Product> products = new Dictionary<int, Product>
+        
+        private static Dictionary<int, ProductModel> staticProducts = new Dictionary<int, ProductModel>
         {
-            { 1, new Product { Name = "Phone", Price = 599.99m } },
-            { 2, new Product { Name = "Apples", Price = 1.99m } },
-            { 3, new Product { Name = "Interior Doors", Price = 199.99m } }
+            { 1, new ProductModel { Id = 1, Name = "Phone", Price = 599.99m } },
+            { 2, new ProductModel { Id = 2, Name = "Apples", Price = 1.99m } },
+            { 3, new ProductModel { Id = 3, Name = "Interior Doors", Price = 199.99m } }
         };
 
-        // Валідатор для моделі Product
-        private readonly IValidator<Product> _validator;
+        private readonly ApplicationDbContext _context;
+        private readonly IValidator<ProductModel> _validator;
 
-        public ProductsController(IValidator<Product> validator)
+        public ProductsController(ApplicationDbContext context, IValidator<ProductModel> validator)
         {
+            _context = context;
             _validator = validator;
         }
 
-        // Метод для отримання всіх продуктів
+       
         [HttpGet]
-        public ActionResult<IEnumerable<Product>> GetAllProducts()
+        public async Task<ActionResult<IEnumerable<ProductModel>>> GetAllProducts()
         {
-            return Ok(products.Values);
+            var productsFromDb = await _context.Products.ToListAsync();
+            return Ok(productsFromDb);
         }
 
-        // Метод для отримання продукту за ID
+        
         [HttpGet("{id}")]
-        public ActionResult<Product> GetProductById(int id)
+        public async Task<ActionResult<ProductModel>> GetProductById(int id)
         {
-            if (products.TryGetValue(id, out var product))
-            {
-                return Ok(product);
-            }
-            else
+            var productFromDb = await _context.Products.FindAsync(id);
+
+            if (productFromDb == null)
             {
                 return NotFound($"Product with ID {id} not found");
             }
+
+            return Ok(productFromDb);
         }
 
-        // Метод для додавання нового продукту (з валідацією)
+        
         [HttpPost]
-        public ActionResult<IEnumerable<Product>> AddProduct(Product product)
+        public async Task<ActionResult<ProductModel>> AddProduct(ProductModel product)
         {
-            // Валідація моделі
+            
             ValidationResult result = _validator.Validate(product);
 
             if (!result.IsValid)
             {
-                // Повертаємо помилки валідації
                 return BadRequest(result.Errors);
             }
 
-            // Додаємо продукт до списку
-            int newId = products.Count + 1;
-            products.Add(newId, product);
+            
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync();
 
-            // Повертаємо оновлений список продуктів
-            return Ok(products.Values);
+            
+            return CreatedAtAction(nameof(GetProductById), new { id = product.Id }, product);
+        }
+
+        
+        [HttpGet("static")]
+        public ActionResult<IEnumerable<ProductModel>> GetStaticProducts()
+        {
+            return Ok(staticProducts.Values);
         }
     }
 
-    // Модель Product
-    public class Product
-    {
-        public string Name { get; set; }
-        public decimal Price { get; set; }
-    }
-
-    // Валідатор для моделі Product
-    public class ProductValidator : AbstractValidator<Product>
+    
+    public class ProductValidator : AbstractValidator<ProductModel>
     {
         public ProductValidator()
         {
