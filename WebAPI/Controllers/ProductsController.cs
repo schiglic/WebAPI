@@ -2,9 +2,10 @@
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using FluentValidation;
-using FluentValidation.Results;
-using WebAPI; 
+using FluentValidation.Results; // Додано цей using
+using WebAPI;
 
 namespace WebAPI.Controllers
 {
@@ -12,7 +13,6 @@ namespace WebAPI.Controllers
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
-        
         private static Dictionary<int, ProductModel> staticProducts = new Dictionary<int, ProductModel>
         {
             { 1, new ProductModel { Id = 1, Name = "Phone", Price = 599.99m } },
@@ -29,7 +29,6 @@ namespace WebAPI.Controllers
             _validator = validator;
         }
 
-       
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ProductModel>>> GetAllProducts()
         {
@@ -37,7 +36,6 @@ namespace WebAPI.Controllers
             return Ok(productsFromDb);
         }
 
-        
         [HttpGet("{id}")]
         public async Task<ActionResult<ProductModel>> GetProductById(int id)
         {
@@ -51,35 +49,44 @@ namespace WebAPI.Controllers
             return Ok(productFromDb);
         }
 
-        
         [HttpPost]
         public async Task<ActionResult<ProductModel>> AddProduct(ProductModel product)
         {
-            
-            ValidationResult result = _validator.Validate(product);
+            ValidationResult result = _validator.Validate(product); // Тепер це працює
 
             if (!result.IsValid)
             {
                 return BadRequest(result.Errors);
             }
 
-            
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
-            
             return CreatedAtAction(nameof(GetProductById), new { id = product.Id }, product);
         }
 
-        
         [HttpGet("static")]
         public ActionResult<IEnumerable<ProductModel>> GetStaticProducts()
         {
             return Ok(staticProducts.Values);
         }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteProduct(int id)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                return NotFound($"Product with ID {id} not found");
+            }
+
+            _context.Products.Remove(product);
+            await _context.SaveChangesAsync();
+
+            return NoContent(); // Повертаємо статус 204 (No Content)
+        }
     }
 
-    
     public class ProductValidator : AbstractValidator<ProductModel>
     {
         public ProductValidator()
